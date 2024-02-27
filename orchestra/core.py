@@ -2,10 +2,11 @@ import asyncio
 import datetime
 import importlib
 import logging
-import sys
+import signal
 from typing import Callable
 
 import pytz
+import uvicorn
 from celery import Celery
 from celery.backends.database import session_cleanup
 from rich.live import Live
@@ -18,16 +19,15 @@ from orchestra.formatting import get_scheduler_status_table, pretty_print_block
 from orchestra.models import Log
 from orchestra.scheduling import Schedule
 
-FORMAT = "%(message)s"
 logging.basicConfig(
-    level="INFO", format=FORMAT, datefmt="[%X]", handlers=[RichHandler()]
+    level="INFO", format="%(message)s", datefmt="[%X]", handlers=[RichHandler(rich_tracebacks=True, tracebacks_show_locals=True)]
 )
 
 logger = logging.getLogger("orchestra.core")
 
 
 class Orchestra(Celery):
-    def __init__(self, backend_conn_str: str, backend_module_name: str = "orchestra.backend.OrchestraBackend", **kwargs):
+    def __init__(self, backend_conn_str: str, backend_module_name: str = "orchestra.backend.OrchestraBackend", enable_api=False, scheduler_loop_resolution_in_seconds: float | int = 0.1, **kwargs):
         super().__init__(
             backend=f"{backend_module_name}+{backend_conn_str}",
             result_extended=True,
@@ -36,19 +36,44 @@ class Orchestra(Celery):
             **kwargs,
         )
         self.scheduler: Scheduler | None = None
+        self.loop = None
+        self.enable_api = enable_api
+        self.loop_resolution_in_seconds = scheduler_loop_resolution_in_seconds
+        self.server: uvicorn.Server | None = None
 
-    async def run(self, loop_resolution_in_seconds: float | int = 0.1) -> None:
-        logger.info("Orchestra starting")
+    async def api_server(self):
+        config = uvicorn.Config("orchestra.api:app", port=5000)
+
+        self.server = uvicorn.Server(config)
+        await self.server.serve()
+
+    async def live_output(self):
         with Live(
                 get_scheduler_status_table(self.scheduler), refresh_per_second=10
         ) as live:
             while True:
-                try:
-                    await asyncio.sleep(loop_resolution_in_seconds)
-                    live.update(get_scheduler_status_table(self.scheduler))
-                except asyncio.CancelledError:
-                    logger.warning("User-requested shutdown.")
-                    sys.exit(0)
+                await asyncio.sleep(self.loop_resolution_in_seconds)
+                live.update(get_scheduler_status_table(self.scheduler))
+
+    async def run(self) -> None:
+        logger.info("Orchestra starting")
+
+        tasks = [asyncio.create_task(self.live_output())]
+
+        if self.enable_api:
+            tasks.append(asyncio.create_task(self.api_server()))
+        try:
+            # uvicorn swallows Cancellation requests >>>:((((
+            # https://github.com/encode/uvicorn/issues/1579
+            # https://docs.python.org/3/library/asyncio-task.html#task-cancellation
+            _, pending_tasks = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            logger.warning("User-requested shutdown.")
+            for task in pending_tasks:
+                task.cancel()
+            await asyncio.wait(pending_tasks)
+
+        except (asyncio.CancelledError, KeyboardInterrupt):
+            logger.warning("User-requested shutdown.")
 
     @staticmethod
     def get_job_by_name(scheduler: Scheduler, job_name: str) -> Job:
@@ -85,7 +110,7 @@ class Orchestra(Celery):
         return celery_task
 
     async def create_schedule(self, module_definitions: dict = None, loop=None) -> None:
-        self.scheduler = Scheduler(tzinfo=pytz.utc, loop=loop)
+        self.scheduler = Scheduler(tzinfo=pytz.utc, loop=self.get_event_loop(loop))
 
         session = self.backend.ResultSession()
         with session_cleanup(session):
@@ -179,3 +204,6 @@ class Orchestra(Celery):
                         tags=schedule_definition.get("tags"),
                         **resume_parameters,
                     )
+
+    def get_event_loop(self, loop):
+        self.loop = loop or asyncio.get_running_loop()

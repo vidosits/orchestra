@@ -12,6 +12,8 @@ sqlalchemy = "^2.0.25"
 psycopg2-binary = "^2.9.9"
 scheduler = "^0.8.5"
 pytz = "^2023.3.post1"
+fastapi = "^0.110.0"
+uvicorn = {extras = ["standard"], version = "^0.27.1"}
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.1.14"
