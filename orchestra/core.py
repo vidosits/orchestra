@@ -2,7 +2,6 @@ import asyncio
 import datetime
 import importlib
 import logging
-import signal
 from typing import Callable
 
 import pytz
@@ -25,9 +24,12 @@ logging.basicConfig(
 
 logger = logging.getLogger("orchestra.core")
 
+instance: "Orchestra | None" = None
+
 
 class Orchestra(Celery):
-    def __init__(self, backend_conn_str: str, backend_module_name: str = "orchestra.backend.OrchestraBackend", enable_api=False, scheduler_loop_resolution_in_seconds: float | int = 0.1, **kwargs):
+    def __init__(self, backend_conn_str: str, backend_module_name: str = "orchestra.backend.OrchestraBackend", enable_api=False, api_address: str = "localhost:5000",
+                 scheduler_loop_resolution_in_seconds: float | int = 0.1, **kwargs):
         super().__init__(
             backend=f"{backend_module_name}+{backend_conn_str}",
             result_extended=True,
@@ -38,11 +40,22 @@ class Orchestra(Celery):
         self.scheduler: Scheduler | None = None
         self.loop = None
         self.enable_api = enable_api
+        self.api_address = api_address
         self.loop_resolution_in_seconds = scheduler_loop_resolution_in_seconds
         self.server: uvicorn.Server | None = None
 
     async def api_server(self):
-        config = uvicorn.Config("orchestra.api:app", port=5000)
+        log_config = uvicorn.config.LOGGING_CONFIG
+        log_config["loggers"] = []
+
+        try:
+            host, port_str = self.api_address.split(":")
+            port = int(port_str)
+        except ValueError:
+            host = self.api_address
+            port = 8000
+
+        config = uvicorn.Config("orchestra.api.main:app", host=host, port=port, log_config=log_config, reload=True, reload_includes="./**")
 
         self.server = uvicorn.Server(config)
         await self.server.serve()
@@ -62,6 +75,8 @@ class Orchestra(Celery):
 
         if self.enable_api:
             tasks.append(asyncio.create_task(self.api_server()))
+            global instance
+            instance = self
         try:
             # uvicorn swallows Cancellation requests >>>:((((
             # https://github.com/encode/uvicorn/issues/1579
