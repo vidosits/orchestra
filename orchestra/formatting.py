@@ -25,7 +25,7 @@ def get_scheduler_status_table(scheduler: Scheduler) -> Table:
     table.pad_edge = False
 
     table.add_column("Frequency", style="green")
-    table.add_column("Task name", style="blue")
+    table.add_column("Job name", style="blue")
     table.add_column("Module and task", style="magenta")
     table.add_column("Due at", style="red")
     table.add_column("Timezone", style="bright_blue")
