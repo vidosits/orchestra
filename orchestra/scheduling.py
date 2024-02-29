@@ -27,12 +27,10 @@ class Schedule:
             logger.critical(
                 f"Missing schedule definition in:\n\n{pretty_print_block(self.definition)}"
             )
-            sys.exit(-1)
         if "timing" not in definition["schedule"]:
             logger.critical(
                 f"Missing timing definition in:\n\n{pretty_print_block(self.definition)}"
             )
-            sys.exit(-1)
 
         self.job_type, self.trigger, self.timing = self.parse_timing()
         self.timezone = self.maybe_parse_timezone()
@@ -263,7 +261,6 @@ class Schedule:
         logger.critical(
             f"Couldn't parse timing definition in:\n\n{pretty_print_block(self.definition)}"
         )
-        sys.exit(-1)
 
     def maybe_parse_timezone(self) -> pytz.tzinfo.BaseTzInfo | None:
         tz = self.definition.get("schedule").get("timezone")
@@ -275,7 +272,6 @@ class Schedule:
             logger.critical(
                 f"Unable to parse timezone {tz} in:\n\n{pretty_print_block(self.definition)}"
             )
-            sys.exit(-1)
 
     def get_timing(self):
         if self.trigger:
