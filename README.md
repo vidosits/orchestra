@@ -119,7 +119,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### Adding jobs programatically
+### Adding jobs programmatically
 
 ```python
 import asyncio
