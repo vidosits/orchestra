@@ -1,7 +1,7 @@
 # Orchestra
 
 Orchestra is:
-- a job scheduler
+- an asyncio based job scheduler
 - using [Celery](https://docs.celeryq.dev/) (which is a distributed task queue) under the hood for running tasks/jobs
 - using [scheduler](https://digon.io/hyd/project/scheduler/t/master/readme.html) under the hood which is a simple in-process python scheduler library with asyncio, threading and timezone support.
 
@@ -18,7 +18,7 @@ Orchestra is:
 ### Schedule definition
 
 ```yaml
-- name: sample-tasks # this has no bearing on how orchestra works whatsoever, you may name your blocks in any way
+- name: sample-tasks # optional name for this block, this has no bearing on how orchestra works whatsoever, you may name your blocks in any way
   module: tasks # this is the python module where celery will look for the task
   schedules: # a list of schedules
     - name: "short_task_every_1_second" # name of the task that shows up in the logs, *has to be unique*
@@ -26,7 +26,7 @@ Orchestra is:
       enabled: false # if it's not enabled it will be ignored
       schedule: 
         timing: "every 00:00:01" # see the examples for a list of understood expressions
-        timezone: Europe/Budapest # name of a time zone from the tz database
+        timezone: Europe/Paris # name of a time zone from the tz database
       tags: # tags are list of string, they may be used to group together tasks
         - cpu
         - fast
@@ -61,17 +61,73 @@ A list of examples of understood expressions:
 * once in 17 seconds
 
 ### Creating an instance
-`tasks.py`
+`main.py`
 ```python
-import os
-from time import sleep
+import asyncio
 
 from orchestra import Orchestra
 
 orchestra = Orchestra(
-    broker=os.getenv("ORCHESTRA_CELERY_BROKER_CONN_STRING", "sqla+sqlite:///log.db"),
-    backend_conn_str=os.getenv('ORCHESTRA_CELERY_BACKEND_DB_CONN_STRING', 'sqlite:///log.db'),
+    broker="sqla+sqlite:///log.db",
+    backend_conn_str="sqlite:///log.db",
     broker_connection_retry_on_startup=True,
+)
+
+
+@orchestra.task
+def simple_task():
+    return "hello world"
+
+
+async def main():
+    schedule_definitions = [
+        {"module": "main",
+         "schedules": [
+             {
+                 "name": "Simple Task every 48 hours",
+                 "task": "simple_task",
+                 "enabled": True,
+                 "schedule": {
+                     "timing": "every 48:00:00",
+                 }
+             }
+         ]}
+    ]
+
+    await orchestra.create_schedule(schedule_definitions)  # you have to create a schedule first, optionally preload a schedule definition file
+    await orchestra.run()  # run Orchestra
+
+
+if __name__ == "__main__":
+    asyncio.run(main())  # Orchestra is based on the scheduler package, which uses asyncio under the hood
+
+```
+the output would be something like
+```bash
+[22:29:56] INFO     Job Simple Task every 48 hours was scheduled to  core.py:240
+                    run every every 48:00:00, None                              
+           INFO     Orchestra starting                                core.py:75
+╭────────────────┬────────────────────────────────────────────┬────────────────────────────┬────────────────────────────────┬────────────────┬────────────┬───────────────┬───────╮
+│Frequency       │ Job name                                   │ Module and task            │ Due at                         │ Timezone       │ Due in     │ Attempts      │ Tags  │
+├────────────────┼────────────────────────────────────────────┼────────────────────────────┼────────────────────────────────┼────────────────┼────────────┼───────────────┼───────┤
+│CYCLIC          │ Simple Task every 48 hours                 │ main.simple_task           │ 2024-03-02 21:29:56            │ UTC            │ 1 day      │ 0/inf         │       │
+╰────────────────┴────────────────────────────────────────────┴────────────────────────────┴────────────────────────────────┴────────────────┴────────────┴───────────────┴───────╯
+╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Orchestrating jobs ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
+╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+```
+
+
+You may also use a standalone python module for holding your tasks, but you have to declare orchestra there as well or import it from the main module:
+`tasks.py`
+```python
+from time import sleep
+from orchestra import Orchestra
+
+orchestra = Orchestra(
+    broker="sqla+sqlite:///log.db",  # any Celery supported broker connection string will work here
+    backend_conn_str="sqlite:///log.db",  # any SQLAlchemy 2 supported backend connection string will work here
+    broker_connection_retry_on_startup=True,  # any Celery supported keyword argument can be passed through to Celery
 )
 
 
@@ -93,56 +149,25 @@ def long_task() -> int:
     return fibo(33)
 ```
 
-`main.py`
-```python
-import asyncio
-import os
-import yaml
-from orchestra import Orchestra
-
-orchestra = Orchestra(
-    broker=os.getenv("ORCHESTRA_CELERY_BROKER_CONN_STRING", "sqla+sqlite:///log.db"),
-    backend_conn_str=os.getenv('ORCHESTRA_CELERY_BACKEND_DB_CONN_STRING', 'sqlite:///log.db'),
-    broker_connection_retry_on_startup=True,
-)
-
-
-async def main():
-    schedule_definitions = yaml.safe_load(
-        open(os.getenv("ORCHESTRA_TASK_SCHEDULE", "schedule.yaml"), "rt")
-    )
-    await orchestra.create_schedule(schedule_definitions)
-    await orchestra.run()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
 ### Adding jobs programmatically
 
 ```python
 import asyncio
-import os
-import yaml
 import datetime
 from orchestra import Orchestra
+from orchestra.scheduling import Schedule
 
 orchestra = Orchestra(
-    broker=os.getenv("ORCHESTRA_CELERY_BROKER_CONN_STRING", "sqla+sqlite:///log.db"),
-    backend_conn_str=os.getenv('ORCHESTRA_CELERY_BACKEND_DB_CONN_STRING', 'sqlite:///log.db'),
+    broker="sqla+sqlite:///log.db",
+    backend_conn_str="sqlite:///log.db",
     broker_connection_retry_on_startup=True,
 )
 
 
 async def main():
-    schedule_definitions = yaml.safe_load(
-        open(os.getenv("ORCHESTRA_TASK_SCHEDULE", "schedule.yaml"), "rt")
-    )
-    
-    custom_schedule: Schedule = ...
-    await orchestra.create_schedule(schedule_definitions)
-    orchestra.scheduler.cyclic(datetime.timedelta(seconds=10), orchestra.create_task_from_schedule(module_name, task_name, custom_schedule), alias="sample task")
+    custom_schedule: Schedule = ...  # see the "Schedule definition" section for an example
+    await orchestra.create_schedule()
+    orchestra.scheduler.cyclic(datetime.timedelta(seconds=10), orchestra.create_task_from_schedule("my_module", "my_task", custom_schedule), alias="sample task")
     await orchestra.run()
 
 
@@ -157,13 +182,14 @@ You may optionally provide an `api_address` parameter to control which `host:por
 
 ```python
 import asyncio
-import os
+
 import yaml
+
 from orchestra import Orchestra
 
 orchestra = Orchestra(
-    broker=os.getenv("ORCHESTRA_CELERY_BROKER_CONN_STRING", "sqla+sqlite:///log.db"),
-    backend_conn_str=os.getenv('ORCHESTRA_CELERY_BACKEND_DB_CONN_STRING', 'sqlite:///log.db'),
+    broker="sqla+sqlite:///log.db",
+    backend_conn_str="sqlite:///log.db",
     enable_api=True,
     api_address="0.0.0.0:5000",
     broker_connection_retry_on_startup=True,
@@ -171,9 +197,7 @@ orchestra = Orchestra(
 
 
 async def main():
-    schedule_definitions = yaml.safe_load(
-        open(os.getenv("ORCHESTRA_TASK_SCHEDULE", "schedule.yaml"), "rt")
-    )
+    schedule_definitions = yaml.safe_load(open("schedule.yaml", "rt"))
     await orchestra.create_schedule(schedule_definitions)
     await orchestra.run()
 
