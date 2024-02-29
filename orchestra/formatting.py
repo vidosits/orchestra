@@ -1,5 +1,7 @@
 import yaml
 from rich import box
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 from rich.table import Table
 from scheduler import Scheduler
 
@@ -19,7 +21,10 @@ def transform_timing_to_frequency(timing: str) -> str:
 
 
 def get_scheduler_status_table(scheduler: Scheduler) -> Table:
-    table = Table()
+    grid = Table.grid(expand=True)
+    grid.add_column()
+
+    table = Table(expand=True)
     table.border_style = "bright_yellow"
     table.box = box.ROUNDED
     table.pad_edge = False
@@ -31,6 +36,7 @@ def get_scheduler_status_table(scheduler: Scheduler) -> Table:
     table.add_column("Timezone", style="bright_blue")
     table.add_column("Due in", style="cyan")
     table.add_column("Attempts")
+    table.add_column("Tags")
 
     for job in scheduler.jobs:
         row = job._str()
@@ -42,7 +48,13 @@ def get_scheduler_status_table(scheduler: Scheduler) -> Table:
             str(job.datetime.tzinfo),
             row[5],
             f"{row[6]}/{row[7]}",
+            ",".join(job.tags)
         )
         table.add_row(*entries)
 
-    return table
+    progress = Progress(TextColumn("{task.description}"), BarColumn(bar_width=None), expand=True, transient=True)
+    progress.add_task("Orchestrating jobs", total=None)
+    grid.add_row(table)
+    grid.add_row(Panel(progress, expand=True, border_style="bright_yellow"))
+
+    return grid
