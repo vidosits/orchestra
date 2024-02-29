@@ -21,7 +21,7 @@ Orchestra is:
 - name: sample-tasks # this has no bearing on how orchestra works whatsoever, you may name your blocks in any way
   module: tasks # this is the python module where celery will look for the task
   schedules: # a list of schedules
-    - name: "short_task_every_1_second" # name of the task that shows up in the logs
+    - name: "short_task_every_1_second" # name of the task that shows up in the logs, *has to be unique*
       task: short_task # the function in the module decorated by `orchestra.task`
       enabled: false # if it's not enabled it will be ignored
       schedule: 
@@ -150,3 +150,34 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
+### Using the API
+
+Orchestra comes with a built-in API accessible by setting `api_server=True` on the `Orchestra` instance.
+You may optionally provide an `api_address` parameter to control which `host:port` gets bound by `uvicorn`.
+
+```python
+import asyncio
+import os
+import yaml
+from orchestra import Orchestra
+
+orchestra = Orchestra(
+    broker=os.getenv("ORCHESTRA_CELERY_BROKER_CONN_STRING", "sqla+sqlite:///log.db"),
+    backend_conn_str=os.getenv('ORCHESTRA_CELERY_BACKEND_DB_CONN_STRING', 'sqlite:///log.db'),
+    enable_api=True,
+    api_address="0.0.0.0:5000",
+    broker_connection_retry_on_startup=True,
+)
+
+
+async def main():
+    schedule_definitions = yaml.safe_load(
+        open(os.getenv("ORCHESTRA_TASK_SCHEDULE", "schedule.yaml"), "rt")
+    )
+    await orchestra.create_schedule(schedule_definitions)
+    await orchestra.run()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
