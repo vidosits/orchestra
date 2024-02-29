@@ -137,7 +137,7 @@ class Orchestra(Celery):
         return celery_task
 
     async def create_schedule(self, module_definitions: list[dict] = None, loop=None) -> None:
-        self.scheduler = Scheduler(tzinfo=pytz.utc, loop=self.get_event_loop(loop))
+        self.scheduler = self.scheduler or Scheduler(tzinfo=pytz.utc, loop=self.get_event_loop(loop))
         if module_definitions is not None:
             self.add_schedules(module_definitions)
 
