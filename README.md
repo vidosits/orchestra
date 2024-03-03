@@ -15,6 +15,14 @@ Orchestra is:
 - scheduler > 0.8.5
 - pytz > 2023.3.post1
 
+## Installation
+
+Install from pypi:
+
+```bash
+pip install pyorchestra
+```
+
 ## Getting started
 
 ### Schedule definition
