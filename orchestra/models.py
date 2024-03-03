@@ -1,9 +1,10 @@
 from datetime import datetime
+from enum import Enum
 
 import sqlalchemy as sa
 from celery.backends.database.models import TaskExtended, ResultModelBase
-from sqlalchemy import TIMESTAMP
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import TIMESTAMP, Text, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
 class TimingAwareTask(TaskExtended):
@@ -23,7 +24,7 @@ class TimingAwareTask(TaskExtended):
         return task_dict
 
 
-class Log(ResultModelBase):
+class Run(ResultModelBase):
     __tablename__ = "orchestra_scheduler_logs"
     __table_args__ = {'sqlite_autoincrement': True}
 
@@ -31,6 +32,16 @@ class Log(ResultModelBase):
     job: Mapped[str]
     module: Mapped[str]
     task: Mapped[str]
+    task_id: Mapped[str] = mapped_column(Text, ForeignKey("celery_taskmeta.task_id"))
     schedule: Mapped[str]
     timezone: Mapped[str | None]
     triggered_date: Mapped[datetime] = sa.Column(TIMESTAMP(timezone=True))
+
+    task_object = relationship("TimingAwareTask", foreign_keys=[task_id])
+
+
+class StatusEnum(str, Enum):
+    pending = "pending"
+    started = "started"
+    success = "success"
+    failure = "failure"

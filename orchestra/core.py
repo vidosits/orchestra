@@ -19,9 +19,10 @@ from scheduler.asyncio import Scheduler
 from scheduler.asyncio.job import Job
 from scheduler.trigger.core import Weekday
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 
 from orchestra.formatting import pretty_print_block, get_job_state
-from orchestra.models import Log
+from orchestra.models import Run
 from orchestra.scheduling import Schedule
 
 logging.basicConfig(
@@ -114,6 +115,10 @@ class Orchestra(Celery):
 
     def wrap_celery_task(self, job_name: str, task: celery.Task):
         async def celery_task():
+            task_meta = task.delay()
+            logger.debug(f"Triggered job {job_name}")
+            task_meta.created_date = datetime.datetime.now(tz=pytz.utc)
+
             session = self.backend.ResultSession()
             with session_cleanup(session):
                 trigger_timestamp = datetime.datetime.now(tz=pytz.utc)
@@ -123,20 +128,17 @@ class Orchestra(Celery):
 
                 module_name, _, task_name = task.name.rpartition(".")
 
-                scheduler_log = Log(
+                scheduler_log = Run(
                     job=job_name,
                     module=module_name,
                     task=task_name,
+                    task_id=task_meta.id,
                     schedule=job.type.name if job.max_attempts != 1 else "ONCE",
                     timezone=job.datetime.tzname(),
                     triggered_date=trigger_timestamp,
                 )
                 session.add(scheduler_log)
                 session.commit()
-
-            task_meta = task.delay()
-            logger.debug(f"Triggered job {job_name}")
-            task_meta.created_date = datetime.datetime.now(tz=pytz.utc)
 
         celery_task.__name__ = task.name
         return celery_task
@@ -165,12 +167,12 @@ class Orchestra(Celery):
             resume_parameters: dict = {}
             if attempt_resume:
                 logs = (
-                    select(Log)
-                    .where(Log.job == job_name)
-                    .order_by(Log.triggered_date.desc())
+                    select(Run)
+                    .where(Run.job == job_name)
+                    .order_by(Run.triggered_date.desc())
                     .limit(1)
                 )
-                last_run: Log | None = next(session.scalars(logs), None)
+                last_run: Run | None = next(session.scalars(logs), None)
                 if last_run is not None:
                     last_run_utc = last_run.triggered_date.replace(tzinfo=pytz.utc)
                     last_running_time_local = last_run_utc.astimezone(
@@ -368,15 +370,17 @@ class Orchestra(Celery):
 
         return jobs_to_trigger
 
-    def get_runs_of_a_job(self, job_name: str, page_size: int, page: int) -> list[Log]:
+    def get_runs_of_a_job(self, job_name: str, page_size: int, page: int) -> list[Run]:
         session = self.backend.ResultSession()
         with session_cleanup(session):
-            return list(session.scalars(select(Log).where(Log.job == job_name).order_by(Log.triggered_date.desc()).offset((page - 1) * page_size).limit(page_size)))
+            runs: list[Run] = list(session.scalars(select(Run).where(Run.job == job_name).order_by(Run.triggered_date.desc()).offset((page - 1) * page_size).limit(page_size).options(joinedload(Run.task_object))))
+            return runs
 
-    def get_run_of_a_job_by_id(self, job_name: str, run_id: int) -> Log | None:
+    def get_run_of_a_job_by_id(self, job_name: str, run_id: int) -> Run | None:
         session = self.backend.ResultSession()
         with session_cleanup(session):
-            return next(session.scalars(select(Log).where(Log.job == job_name, Log.id == run_id).limit(1)), None)
+            run: Run = next(session.scalars(select(Run).where(Run.job == job_name, Run.id == run_id).limit(1).options(joinedload(Run.task_object))), None)
+            return run
 
     def get_scheduler_status_table(self) -> Table:
         grid = Table.grid(expand=True)

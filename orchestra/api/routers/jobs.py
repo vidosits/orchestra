@@ -4,7 +4,7 @@ from fastapi import APIRouter, Body, Path, Query, Response, status
 
 from orchestra.api.dto import JobDTO, ScheduleDefinitionDTO, RunDTO
 from orchestra.core import instance
-from orchestra.models import Log
+from orchestra.models import Run
 
 router = APIRouter()
 
@@ -78,7 +78,7 @@ async def get_runs_of_job(job_name: Annotated[str, Path(description="The name of
 async def get_run_of_job_by_id(job_name: Annotated[str, Path(description="The name of the job to for which to fetch runs")],
                                run_id: Annotated[int, Path(description="The id of the run to fetch")], response: Response) -> RunDTO | str:
     if instance.job_exists(job_name):
-        run: Log | None = instance.get_run_of_a_job_by_id(job_name, run_id)
+        run: Run | None = instance.get_run_of_a_job_by_id(job_name, run_id)
         if run is not None:
             return RunDTO.map(run)
         else:
