@@ -25,7 +25,7 @@ class TimingAwareTask(TaskExtended):
 
 
 class Run(ResultModelBase):
-    __tablename__ = "orchestra_scheduler_logs"
+    __tablename__ = "orchestra_run"
     __table_args__ = {'sqlite_autoincrement': True}
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -40,7 +40,7 @@ class Run(ResultModelBase):
     task_object = relationship("TimingAwareTask", foreign_keys=[task_id])
 
 
-class StatusEnum(str, Enum):
+class Status(str, Enum):
     pending = "pending"
     started = "started"
     success = "success"

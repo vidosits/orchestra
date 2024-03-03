@@ -5,7 +5,7 @@ import signal
 from fastapi import FastAPI
 from rich.logging import RichHandler
 
-from orchestra.api.routers import jobs
+from orchestra.api.routers import jobs, tasks
 from orchestra.core import instance
 
 logging.basicConfig(
@@ -16,6 +16,7 @@ logger = logging.getLogger("orchestra.api")
 
 app = FastAPI(title="Orchestra")
 app.include_router(jobs.router)
+app.include_router(tasks.router)
 
 if instance is None:
     logger.error("Orchestra is not started, can't start API server")

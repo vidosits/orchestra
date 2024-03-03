@@ -22,7 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
 from orchestra.formatting import pretty_print_block, get_job_state
-from orchestra.models import Run
+from orchestra.models import Run, TimingAwareTask
 from orchestra.scheduling import Schedule
 
 logging.basicConfig(
@@ -381,6 +381,11 @@ class Orchestra(Celery):
         with session_cleanup(session):
             run: Run = next(session.scalars(select(Run).where(Run.job == job_name, Run.id == run_id).limit(1).options(joinedload(Run.task_object))), None)
             return run
+
+    def get_task_by_id(self, task_id: str) -> TimingAwareTask | None:
+        session = self.backend.ResultSession()
+        with session_cleanup(session):
+            return next(session.scalars(select(TimingAwareTask).where(TimingAwareTask.task_id == task_id).limit(1)), None)
 
     def get_scheduler_status_table(self) -> Table:
         grid = Table.grid(expand=True)
