@@ -1,13 +1,13 @@
 [tool.poetry]
 name = "pyorchestra"
-version = "0.1.0"
+version = "0.1.1"
 description = "Orchestra is a job scheduler on top of Celery"
 authors = ["András Vidosits <andras@hyperplane.hu>"]
 readme = "README.md"
 license = "GPL-2.0-only"
 
 [tool.poetry.dependencies]
-python = "3.11.7"
+python = "^3.11.7"
 celery = "^5.3.6"
 sqlalchemy = "^2.0.25"
 psycopg2-binary = "^2.9.9"
