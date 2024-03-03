@@ -8,7 +8,7 @@ Orchestra is:
 ![demo.svg](demo.svg)
 
 ## Dependencies
-- python 3.11
+- python >= 3.11.7
 - celery > 5.3.6
 - sqlalchemy > 2.0.25
 - psycopg2-binary
