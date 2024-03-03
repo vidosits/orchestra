@@ -266,12 +266,13 @@ class Orchestra(Celery):
                                   tags=set(schedule_definition.get("tags", set())),
                                   attempt_resume=attempt_resume)
 
-    def apply_state_to_jobs(self, jobs: set[Job]) -> set[Job]:
-        def stateful_job(job: Job, is_paused: bool) -> Job:
-            job.is_paused = is_paused
-            return job
+    @classmethod
+    def set_job_state_property(cls, job: Job, is_paused: bool) -> Job:
+        job.is_paused = is_paused
+        return job
 
-        return set([stateful_job(job, is_paused=True if job in self.paused_jobs else False) for job in jobs])
+    def apply_state_to_jobs(self, jobs: set[Job]) -> set[Job]:
+        return set([self.set_job_state_property(job, is_paused=True if job in self.paused_jobs else False) for job in jobs])
 
     def get_jobs(self, tags: set[str], any_tag: bool, include_paused: bool = True):
         # contrary to what get_jobs' docstring says, get_job will not return all jobs when tag is an empty set
@@ -285,6 +286,9 @@ class Orchestra(Celery):
 
         return self.apply_state_to_jobs(active_jobs.union(paused_jobs))
 
+    def job_exists(self, job_name: str):
+        return self.get_job_by_name(job_name, include_paused=True) is not None
+
     def get_paused_jobs(self, tags: set[str], any_tag: bool):
         if len(tags) == 0:
             return self.paused_jobs
@@ -296,7 +300,8 @@ class Orchestra(Celery):
         self.scheduler.delete_job(job)
         self.paused_jobs.add(job)
         logger.info(f"Paused job {job_name}")
-        
+        return self.set_job_state_property(job, is_paused=True)
+
     def pause_jobs_with_tags(self, tags: set[str], any_tag: bool):
         jobs_to_pause = self.get_jobs(tags, any_tag, include_paused=False)
 
@@ -305,13 +310,14 @@ class Orchestra(Celery):
 
         return self.apply_state_to_jobs(jobs_to_pause)
 
-    def resume_job(self, job_name: str):
+    def resume_job(self, job_name: str) -> Job:
         job = self.get_job_by_name(job_name, include_paused=True)
         assert job is not None
         self.paused_jobs.remove(job)
         task = self.scheduler._Scheduler__loop.create_task(self.scheduler._Scheduler__supervise_job(job))
         self.scheduler._Scheduler__jobs[job] = task
         logger.info(f"Resumed job {job_name}")
+        return self.set_job_state_property(job, is_paused=False)
 
     def resume_jobs_with_tags(self, tags: set[str], any_tag: bool):
         jobs_to_resume = self.get_paused_jobs(tags, any_tag)
@@ -361,6 +367,16 @@ class Orchestra(Celery):
                 self.scheduler.delete_job(job)
 
         return jobs_to_trigger
+
+    def get_runs_of_a_job(self, job_name: str, page_size: int, page: int) -> list[Log]:
+        session = self.backend.ResultSession()
+        with session_cleanup(session):
+            return list(session.scalars(select(Log).where(Log.job == job_name).order_by(Log.triggered_date.desc()).offset((page - 1) * page_size).limit(page_size)))
+
+    def get_run_of_a_job_by_id(self, job_name: str, run_id: int) -> Log | None:
+        session = self.backend.ResultSession()
+        with session_cleanup(session):
+            return next(session.scalars(select(Log).where(Log.job == job_name, Log.id == run_id).limit(1)), None)
 
     def get_scheduler_status_table(self) -> Table:
         grid = Table.grid(expand=True)

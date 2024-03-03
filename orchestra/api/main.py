@@ -14,7 +14,7 @@ logging.basicConfig(
 
 logger = logging.getLogger("orchestra.api")
 
-app = FastAPI()
+app = FastAPI(title="Orchestra")
 app.include_router(jobs.router)
 
 if instance is None:
