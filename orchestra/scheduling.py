@@ -265,7 +265,7 @@ class Schedule:
     def maybe_parse_timezone(self) -> pytz.tzinfo.BaseTzInfo | None:
         tz = self.definition.get("schedule").get("timezone")
         if tz is None:
-            return None
+            return pytz.utc
         try:
             return timezone(tz)
         except pytz.exceptions.UnknownTimeZoneError:
@@ -286,7 +286,7 @@ class Schedule:
         naive_datetime = datetime(
             year=year, month=month, day=day, hour=hour, minute=minute, second=second
         )
-        return naive_datetime if tz is None else tz.localize(naive_datetime)
+        return tz.localize(naive_datetime)
 
     def get_localized_time(self, hour: int, minute: int, second: int) -> time:
         tz = self.maybe_parse_timezone()

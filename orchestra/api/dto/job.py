@@ -15,6 +15,7 @@ class JobDTO(BaseModel):
     attempts: int
     max_attempts: str | int
     tags: set[str] | None
+    is_paused: bool
 
     @classmethod
     def map(cls, job: Job) -> "JobDTO":
@@ -27,4 +28,5 @@ class JobDTO(BaseModel):
                       task=job.handle.__name__,
                       attempts=job.attempts,
                       max_attempts=job.max_attempts,
-                      tags=job.tags)
+                      tags=job.tags,
+                      is_paused=job.is_paused)
