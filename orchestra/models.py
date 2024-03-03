@@ -31,6 +31,6 @@ class Log(ResultModelBase):
     job: Mapped[str]
     module: Mapped[str]
     task: Mapped[str]
-    frequency: Mapped[str]
+    schedule: Mapped[str]
     timezone: Mapped[str | None]
     triggered_date: Mapped[datetime] = sa.Column(TIMESTAMP(timezone=True))

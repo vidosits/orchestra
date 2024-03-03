@@ -9,7 +9,7 @@ import scheduler.trigger as weekdays
 from pytz import timezone
 from scheduler import Scheduler
 
-from orchestra.formatting import pretty_print_block, transform_timing_to_frequency
+from orchestra.formatting import pretty_print_block, transform_timing_to_schedule
 
 logger = logging.getLogger("orchestra.scheduling")
 
@@ -231,14 +231,14 @@ class Schedule:
             # if there's a timing (every day/hour/minute) or a weekday (Monday, Tuesday, etc.) specified the time can only be a specific time
             if timing or weekday:
                 trigger = getattr(weekdays, weekday) if weekday else None
-                frequency = (
-                    getattr(self.scheduler, transform_timing_to_frequency(timing))
+                schedule = (
+                    getattr(self.scheduler, transform_timing_to_schedule(timing))
                     if timing
                     else self.scheduler.weekly
                 )
 
                 return (
-                    frequency,
+                    schedule,
                     trigger,
                     self.get_localized_time(
                         hour=int(match.group(3)),

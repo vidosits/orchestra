@@ -11,7 +11,7 @@ def pretty_print_block(config_block: dict) -> str:
     return yaml.dump(config_block, allow_unicode=True, default_flow_style=False)
 
 
-def transform_timing_to_frequency(timing: str) -> str:
+def transform_timing_to_schedule(timing: str) -> str:
     """
     timing: "day", "hour", "minute"
 

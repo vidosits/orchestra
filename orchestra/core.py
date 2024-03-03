@@ -127,7 +127,7 @@ class Orchestra(Celery):
                     job=job_name,
                     module=module_name,
                     task=task_name,
-                    frequency=job.type.name if job.max_attempts != 1 else "ONCE",
+                    schedule=job.type.name if job.max_attempts != 1 else "ONCE",
                     timezone=job.datetime.tzname(),
                     triggered_date=trigger_timestamp,
                 )
@@ -176,7 +176,7 @@ class Orchestra(Celery):
                     last_running_time_local = last_run_utc.astimezone(
                         pytz.timezone(last_run.timezone)
                     )
-                    match last_run.frequency:
+                    match last_run.schedule:
                         case "ONCE":
                             logger.warning(
                                 f"Job {job_name} was scheduled to run exactly once, but it has already ran on {last_running_time_local}, tz={last_run.timezone}, not scheduling again."

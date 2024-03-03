@@ -5,7 +5,7 @@ from scheduler.asyncio.job import Job
 
 
 class JobDTO(BaseModel):
-    frequency: str
+    schedule: str
     job_name: str | None
     task: str
     start: datetime.datetime | None
@@ -19,7 +19,7 @@ class JobDTO(BaseModel):
 
     @classmethod
     def map(cls, job: Job) -> "JobDTO":
-        return JobDTO(frequency=job._BaseJob__type.name.lower(),
+        return JobDTO(schedule=job._BaseJob__type.name.lower(),
                       job_name=job.alias,
                       start=job.start,
                       due_at=job.datetime,
@@ -29,4 +29,4 @@ class JobDTO(BaseModel):
                       attempts=job.attempts,
                       max_attempts=job.max_attempts,
                       tags=job.tags,
-                      is_paused=job.is_paused)
+                      is_paused=job.is_paused)  # is_paused is dynamically added to the native Job object
