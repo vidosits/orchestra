@@ -1,10 +1,10 @@
 [tool.poetry]
 name = "pyorchestra"
-version = "0.1.1"
+version = "0.1.2"
 description = "Orchestra is a job scheduler on top of Celery"
 authors = ["András Vidosits <andras@hyperplane.hu>"]
 readme = "README.md"
-license = "GPL-2.0-only"
+license = "LGPLv3"
 repository = "https://github.com/vidosits/orchestra"
 
 [tool.poetry.dependencies]
