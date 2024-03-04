@@ -1,11 +1,14 @@
 [tool.poetry]
 name = "pyorchestra"
-version = "0.1.2"
+version = "0.2.0"
 description = "Orchestra is a job scheduler on top of Celery"
 authors = ["András Vidosits <andras@hyperplane.hu>"]
 readme = "README.md"
 license = "LGPLv3"
 repository = "https://github.com/vidosits/orchestra"
+packages = [
+	{ include = "orchestra" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.11.7"
@@ -16,6 +19,7 @@ scheduler = "^0.8.5"
 pytz = "^2023.3.post1"
 fastapi = "^0.110.0"
 uvicorn = {extras = ["standard"], version = "^0.27.1"}
+rich = "^13.7.1"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.1.14"
