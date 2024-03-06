@@ -32,12 +32,12 @@ class Run(ResultModelBase):
     job: Mapped[str]
     module: Mapped[str]
     task: Mapped[str]
-    task_id: Mapped[str] = mapped_column(Text, ForeignKey("celery_taskmeta.task_id"))
+    task_id: Mapped[str]
     schedule: Mapped[str]
     timezone: Mapped[str | None]
     triggered_date: Mapped[datetime] = sa.Column(TIMESTAMP(timezone=True))
 
-    task_object = relationship("TimingAwareTask", foreign_keys=[task_id])
+    task_object = relationship("TimingAwareTask", primaryjoin='foreign(Run.task_id) == TimingAwareTask.task_id')
 
 
 class Status(str, Enum):
