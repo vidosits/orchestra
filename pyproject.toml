@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyorchestra"
-version = "0.3.0"
+version = "0.3.1"
 description = "Orchestra is a job scheduler on top of Celery"
 authors = ["András Vidosits <andras@hyperplane.hu>"]
 readme = "README.md"
