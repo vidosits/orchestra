@@ -37,6 +37,8 @@ pip install pyorchestra
       schedule: 
         timing: "every 00:00:01" # see the examples for a list of understood expressions
         timezone: Europe/Paris # name of a time zone from the tz database
+      additional_options: # everything in this optional section will be passed to the celery task when invoked
+        queue: background-jobs
       tags: # tags are list of string, they may be used to group together tasks
         - cpu
         - fast

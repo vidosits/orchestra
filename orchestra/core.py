@@ -113,9 +113,9 @@ class Orchestra(Celery):
             if job.alias == job_name:
                 return job
 
-    def wrap_celery_task(self, job_name: str, task: celery.Task):
+    def wrap_celery_task(self, job_name: str, task: celery.Task, additional_options: dict):
         async def celery_task():
-            task_meta = task.delay()
+            task_meta = task.apply_async(**additional_options)
             logger.debug(f"Triggered job {job_name}")
             task_meta.created_date = datetime.datetime.now(tz=pytz.utc)
 
@@ -144,16 +144,16 @@ class Orchestra(Celery):
         return celery_task
 
     def __create_job_from_celery_task_schedule(
-            self, job_name: str, module_name: str, task_name: str) -> Callable:
+            self, job_name: str, module_name: str, task_name: str, additional_options: dict) -> Callable:
         module = importlib.import_module(module_name)
         task: celery.Task = getattr(module, task_name)
 
-        return self.wrap_celery_task(job_name, task)
+        return self.wrap_celery_task(job_name, task, additional_options)
 
     def schedule_celery_task(self, job_name: str, task: Callable, schedule: Callable[..., Job], timing: datetime.datetime | datetime.timedelta | datetime.time | Weekday,
-                             tags: set[str] | None = None, attempt_resume: bool = False):
+                             tags: set[str] | None = None, attempt_resume: bool = False, additional_options: dict = None):
         module_name, _, task_name = task.name.rpartition(".")  # type:ignore
-        self.schedule_job(job_name=job_name, module_name=module_name, task_name=task_name, schedule=schedule, timing=timing, tags=tags, attempt_resume=attempt_resume)
+        self.schedule_job(job_name=job_name, module_name=module_name, task_name=task_name, schedule=schedule, timing=timing, tags=tags, attempt_resume=attempt_resume, additional_options=additional_options)
 
     async def create_schedule(self, module_definitions: list[dict] = None, loop=None) -> None:
         self.scheduler = self.scheduler or Scheduler(tzinfo=pytz.utc, loop=self.get_event_loop(loop))
@@ -161,7 +161,7 @@ class Orchestra(Celery):
             self.add_schedules(module_definitions)
 
     def schedule_job(self, job_name: str, module_name: str, task_name: str, schedule: Callable[..., Job], timing: datetime.datetime | datetime.timedelta | datetime.time | Weekday,
-                     tags: set[str] | None = None, attempt_resume: bool = False):
+                     tags: set[str] | None = None, attempt_resume: bool = False, additional_options: dict = None):
         session = self.backend.ResultSession()
         with session_cleanup(session):
             resume_parameters: dict = {}
@@ -201,7 +201,7 @@ class Orchestra(Celery):
             schedule(
                 timing=timing,
                 handle=self.__create_job_from_celery_task_schedule(
-                    job_name, module_name, task_name
+                    job_name, module_name, task_name, additional_options or {}
                 ),
                 alias=job_name,
                 tags=tags or set(),
@@ -266,7 +266,8 @@ class Orchestra(Celery):
                                   schedule=schedule.job_type,
                                   timing=schedule.get_timing(),
                                   tags=set(schedule_definition.get("tags", set())),
-                                  attempt_resume=attempt_resume)
+                                  attempt_resume=attempt_resume,
+                                  additional_options=schedule_definition.get("additional_options"))
 
     @classmethod
     def set_job_state_property(cls, job: Job, is_paused: bool) -> Job:
