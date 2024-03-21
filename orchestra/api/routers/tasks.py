@@ -5,7 +5,7 @@ from fastapi import APIRouter, Path, Response, status
 from orchestra.api.dto import TaskDTO
 from orchestra.core import instance
 
-router = APIRouter()
+router = APIRouter(prefix="/api")
 
 
 @router.get("/tasks/{task_id}", tags=["tasks"])

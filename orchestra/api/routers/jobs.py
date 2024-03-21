@@ -6,10 +6,10 @@ from orchestra.api.dto import JobDTO, ScheduleDefinitionDTO, RunDTO
 from orchestra.core import instance
 from orchestra.models import Run
 
-router = APIRouter()
+router = APIRouter(prefix="/api")
 
 
-@router.get("/jobs/", tags=["jobs"])
+@router.get("/jobs", tags=["jobs"])
 async def get_jobs(tags: Annotated[str | None, Query(description="Comma separated tags to filter scheduled jobs")] = None,
                    any_tag: Annotated[bool, Query(description="Set to true to match if only at least one tag has to match")] = False,
                    include_paused: Annotated[bool, Query(description="Set to true to include paused jobs when searching for a match")] = True) -> list[JobDTO]:
@@ -17,7 +17,7 @@ async def get_jobs(tags: Annotated[str | None, Query(description="Comma separate
     return list(map(lambda job: JobDTO.map(job), instance.get_jobs(tags, any_tag, include_paused=include_paused)))
 
 
-@router.post("/jobs/", tags=["jobs"], status_code=201)
+@router.post("/jobs", tags=["jobs"], status_code=201)
 async def schedule_new_job(module: Annotated[str, Body()], schedule_definition: ScheduleDefinitionDTO):
     module_definition = [
         {"module": module,
@@ -35,7 +35,7 @@ async def schedule_new_job(module: Annotated[str, Body()], schedule_definition: 
     instance.add_schedules(module_definition, attempt_resume=schedule_definition.resume or False)
 
 
-@router.delete("/jobs/", tags=["jobs"])
+@router.delete("/jobs", tags=["jobs"])
 async def delete_scheduled_jobs_matching_tags(tags: Annotated[str | None, Query(description="Comma separated tags to filter scheduled jobs")] = None,
                                               any_tag: Annotated[bool, Query(description="Set to true to match if only at least one tag has to match")] = False,
                                               include_paused: Annotated[bool, Query(description="Set to true to include paused jobs when searching for a match")] = False) -> list[JobDTO]:
@@ -43,7 +43,7 @@ async def delete_scheduled_jobs_matching_tags(tags: Annotated[str | None, Query(
     return list(map(lambda job: JobDTO.map(job), instance.delete_jobs_with_tags(tags, any_tag, include_paused)))
 
 
-@router.post("/jobs/trigger/", tags=["jobs"])
+@router.post("/jobs/trigger", tags=["jobs"])
 async def trigger_scheduled_jobs_matching_tags(tags: Annotated[str | None, Query(description="Comma separated tags to filter scheduled jobs")] = None,
                                                any_tag: Annotated[bool, Query(description="Set to true to match if only at least one tag has to match")] = True,
                                                include_paused: Annotated[bool, Query(description="Set to true to include paused jobs when searching for a match")] = True) -> list[JobDTO]:
@@ -51,14 +51,14 @@ async def trigger_scheduled_jobs_matching_tags(tags: Annotated[str | None, Query
     return list(map(lambda job: JobDTO.map(job), await instance.trigger_jobs_with_tags(tags, any_tag, include_paused)))
 
 
-@router.post("/jobs/pause/", tags=["jobs"])
+@router.post("/jobs/pause", tags=["jobs"])
 async def pause_scheduled_jobs_matching_tags(tags: Annotated[str | None, Query(description="Comma separated tags to filter scheduled jobs")] = None,
                                              any_tag: Annotated[bool, Query(description="Set to true to match if only at least one tag has to match")] = True) -> list[JobDTO]:
     tags: set[str] = set(tags.split(",")) if tags else set()
     return list(map(lambda job: JobDTO.map(job), instance.pause_jobs_with_tags(tags, any_tag)))
 
 
-@router.post("/jobs/resume/", tags=["jobs"])
+@router.post("/jobs/resume", tags=["jobs"])
 async def resume_scheduled_jobs_matching_tags(tags: Annotated[str | None, Query(description="Comma separated tags to filter scheduled jobs")] = None,
                                               any_tag: Annotated[bool, Query(description="Set to true to match if only at least one tag has to match")] = True) -> list[JobDTO]:
     tags: set[str] = set(tags.split(",")) if tags else set()
@@ -89,7 +89,7 @@ async def get_run_of_job_by_id(job_name: Annotated[str, Path(description="The na
         return f"Job {job_name} does not exist"
 
 
-@router.post("/jobs/{job_name}/trigger/", tags=["jobs"])
+@router.post("/jobs/{job_name}/trigger", tags=["jobs"])
 async def trigger_job_by_name(job_name: Annotated[str, Path(description="The name of the job to trigger")], response: Response) -> None | str:
     if instance.job_exists(job_name):
         response.status_code = status.HTTP_204_NO_CONTENT
