@@ -83,7 +83,7 @@ class Orchestra(Celery):
         logger.info("Orchestra starting")
 
         # we need to run 2 tasks in parallel
-        # first one is the live output on the CLI/TUI:sdf
+        # first one is the live output on the CLI/TUI:
         tasks = [asyncio.create_task(self.live_output())]
 
         # the second one is the optionally enabled API server
