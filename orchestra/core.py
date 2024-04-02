@@ -134,7 +134,7 @@ class Orchestra(Celery):
                     task=task_name,
                     task_id=task_meta.id,
                     schedule=job.type.name if job.max_attempts != 1 else "ONCE",
-                    timezone=job.datetime.tzname(),
+                    timezone=job.datetime.tzinfo.zone,
                     triggered_date=trigger_timestamp,
                 )
                 session.add(scheduler_log)
