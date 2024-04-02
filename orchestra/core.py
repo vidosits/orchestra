@@ -282,7 +282,8 @@ class Orchestra(Celery):
         if len(tags) == 0:
             active_jobs = self.scheduler.get_jobs()
         else:
-            active_jobs = self.scheduler.get_jobs(tags, any_tag=any_tag)
+            active_jobs = set(filter(lambda job: job.tags.intersection(tags) if any_tag else job.tags == tags, self.scheduler.jobs))
+
         paused_jobs = set()
         if include_paused:
             paused_jobs = self.get_paused_jobs(tags, any_tag=any_tag)
