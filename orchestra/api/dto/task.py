@@ -10,6 +10,8 @@ from orchestra.models import TimingAwareTask, Status
 class TaskDTO(BaseModel):
     id: int
     task_id: str
+    run_id: int
+    job_name: str
     status: Status
     result: Any
     date_done: datetime.datetime
@@ -26,6 +28,8 @@ class TaskDTO(BaseModel):
     def map(cls, task: TimingAwareTask) -> "TaskDTO":
         return TaskDTO(id=task.id,
                        task_id=task.task_id,
+                       run_id=task.run_id,
+                       job_name=task.job_name,
                        status=Status[task.status.lower()],
                        result=task.result,
                        date_done=task.date_done,

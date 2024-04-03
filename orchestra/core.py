@@ -109,7 +109,7 @@ class Orchestra(Celery):
             logger.warning("User-requested shutdown.")
 
     def get_job_by_name(self, job_name: str, include_paused: bool = False) -> Job | None:
-        for job in self.scheduler.jobs.union(self.paused_jobs if include_paused else []):
+        for job in self.apply_state_to_jobs(self.scheduler.jobs.union(self.paused_jobs if include_paused else [])):
             if job.alias == job_name:
                 return job
 
@@ -280,7 +280,7 @@ class Orchestra(Celery):
     def get_jobs(self, tags: set[str], any_tag: bool, include_paused: bool = True):
         # contrary to what get_jobs' docstring says, get_job will not return all jobs when tag is an empty set
         if len(tags) == 0:
-            active_jobs = self.scheduler.get_jobs()
+            active_jobs = self.scheduler.jobs
         else:
             active_jobs = set(filter(lambda job: job.tags.intersection(tags) if any_tag else job.tags == tags, self.scheduler.jobs))
 
@@ -387,7 +387,13 @@ class Orchestra(Celery):
     def get_task_by_id(self, task_id: str) -> TimingAwareTask | None:
         session = self.backend.ResultSession()
         with session_cleanup(session):
-            return next(session.scalars(select(TimingAwareTask).where(TimingAwareTask.task_id == task_id).limit(1)), None)
+            run_of_task = next(session.scalars(select(Run).where(Run.task_object.has(TimingAwareTask.task_id == task_id)).limit(1).options(joinedload(Run.task_object))), None)
+            if run_of_task is None:
+                return None
+            task: TimingAwareTask = run_of_task.task_object
+            task.run_id = run_of_task.id
+            task.job_name = run_of_task.job
+            return task
 
     def get_scheduler_status_table(self) -> Table:
         grid = Table.grid(expand=True)

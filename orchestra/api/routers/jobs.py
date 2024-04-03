@@ -65,6 +65,15 @@ async def resume_scheduled_jobs_matching_tags(tags: Annotated[str | None, Query(
     return list(map(lambda job: JobDTO.map(job), instance.resume_jobs_with_tags(tags, any_tag)))
 
 
+@router.get("/jobs/{job_name}", tags=["jobs"], status_code=status.HTTP_200_OK)
+async def get_job_by_name(job_name: Annotated[str, Path(description="The name of the job to for which to fetch runs")], response: Response) -> JobDTO | str:
+    if instance.job_exists(job_name):
+        return JobDTO.map(instance.get_job_by_name(job_name, include_paused=True))
+    else:
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return f"Job {job_name} does not exist"
+
+
 @router.get("/jobs/{job_name}/runs", tags=["jobs"], status_code=status.HTTP_200_OK)
 async def get_runs_of_job(job_name: Annotated[str, Path(description="The name of the job to for which to fetch runs")], response: Response, page_size: int = 50, page: int = 1) -> list[RunDTO] | str:
     if instance.job_exists(job_name):
