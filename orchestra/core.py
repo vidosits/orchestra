@@ -2,7 +2,7 @@ import asyncio
 import datetime
 import importlib
 import logging
-from typing import Callable
+from typing import Callable, Any
 
 import celery
 import pytz
@@ -22,6 +22,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
 from orchestra.formatting import pretty_print_block, get_job_state
+from orchestra.job import StatefulJob
 from orchestra.models import Run, TimingAwareTask
 from orchestra.scheduling import Schedule
 
@@ -108,12 +109,7 @@ class Orchestra(Celery):
         except (asyncio.CancelledError, KeyboardInterrupt):
             logger.warning("User-requested shutdown.")
 
-    def get_job_by_name(self, job_name: str, include_paused: bool = False) -> Job | None:
-        for job in self.apply_state_to_jobs(self.scheduler.jobs.union(self.paused_jobs if include_paused else [])):
-            if job.alias == job_name:
-                return job
-
-    def wrap_celery_task(self, job_name: str, task: celery.Task, additional_options: dict):
+    def wrap_celery_task(self, job_name: str, task: celery.Task, additional_options: dict) -> Callable:
         async def celery_task():
             task_meta = task.apply_async(**additional_options)
             logger.debug(f"Triggered job {job_name}")
@@ -122,8 +118,8 @@ class Orchestra(Celery):
             session = self.backend.ResultSession()
             with session_cleanup(session):
                 trigger_timestamp = datetime.datetime.now(tz=pytz.utc)
-                job = self.get_job_by_name(job_name, include_paused=True)
-                if job is None:
+                stateful_job = self.get_job_by_name(job_name)
+                if stateful_job is None:
                     logger.critical(f"Unknown job with name {job_name}")
 
                 module_name, _, task_name = task.name.rpartition(".")
@@ -133,8 +129,8 @@ class Orchestra(Celery):
                     module=module_name,
                     task=task_name,
                     task_id=task_meta.id,
-                    schedule=job.type.name if job.max_attempts != 1 else "ONCE",
-                    timezone=job.datetime.tzinfo.zone,
+                    schedule=stateful_job.job.type.name if stateful_job.job.max_attempts != 1 else "ONCE",
+                    timezone=stateful_job.job.datetime.tzinfo.zone,
                     triggered_date=trigger_timestamp,
                 )
                 session.add(scheduler_log)
@@ -153,7 +149,8 @@ class Orchestra(Celery):
     def schedule_celery_task(self, job_name: str, task: Callable, schedule: Callable[..., Job], timing: datetime.datetime | datetime.timedelta | datetime.time | Weekday,
                              tags: set[str] | None = None, attempt_resume: bool = False, additional_options: dict = None):
         module_name, _, task_name = task.name.rpartition(".")  # type:ignore
-        self.schedule_job(job_name=job_name, module_name=module_name, task_name=task_name, schedule=schedule, timing=timing, tags=tags, attempt_resume=attempt_resume, additional_options=additional_options)
+        self.schedule_job(job_name=job_name, module_name=module_name, task_name=task_name, schedule=schedule, timing=timing, tags=tags, attempt_resume=attempt_resume,
+                          additional_options=additional_options)
 
     async def create_schedule(self, module_definitions: list[dict] = None, loop=None) -> None:
         self.scheduler = self.scheduler or Scheduler(tzinfo=pytz.utc, loop=self.get_event_loop(loop))
@@ -161,7 +158,7 @@ class Orchestra(Celery):
             self.add_schedules(module_definitions)
 
     def schedule_job(self, job_name: str, module_name: str, task_name: str, schedule: Callable[..., Job], timing: datetime.datetime | datetime.timedelta | datetime.time | Weekday,
-                     tags: set[str] | None = None, attempt_resume: bool = False, additional_options: dict = None):
+                     tags: set[str] | None = None, attempt_resume: bool = False, additional_options: dict = None, schedule_definition: Any = None):
         session = self.backend.ResultSession()
         with session_cleanup(session):
             resume_parameters: dict = {}
@@ -198,7 +195,7 @@ class Orchestra(Celery):
                                 "start": next_run_local - datetime.timedelta(seconds=timing.total_seconds())
                             }
 
-            schedule(
+            job = schedule(
                 timing=timing,
                 handle=self.__create_job_from_celery_task_schedule(
                     job_name, module_name, task_name, additional_options or {}
@@ -207,6 +204,9 @@ class Orchestra(Celery):
                 tags=tags or set(),
                 **resume_parameters,
             )
+
+            job.definition = schedule_definition or {}
+
             if "start" in resume_parameters:
                 logger.warning(
                     f"Job {job_name} was scheduled to run {timing}, resuming using {last_running_time_local}, tz={last_run.timezone} as reference time."
@@ -267,115 +267,114 @@ class Orchestra(Celery):
                                   timing=schedule.get_timing(),
                                   tags=set(schedule_definition.get("tags", set())),
                                   attempt_resume=attempt_resume,
-                                  additional_options=schedule_definition.get("additional_options"))
+                                  additional_options=schedule_definition.get("additional_options"),
+                                  schedule_definition=schedule_definition)
 
-    @classmethod
-    def set_job_state_property(cls, job: Job, is_paused: bool) -> Job:
-        job.is_paused = is_paused
-        return job
+    def apply_state_to_jobs(self, jobs: set[Job]) -> set[StatefulJob]:
+        return set([StatefulJob(job, is_paused=True if job in self.paused_jobs else False) for job in jobs])
 
-    def apply_state_to_jobs(self, jobs: set[Job]) -> set[Job]:
-        return set([self.set_job_state_property(job, is_paused=True if job in self.paused_jobs else False) for job in jobs])
-
-    def get_jobs(self, tags: set[str], any_tag: bool, include_paused: bool = True):
-        # contrary to what get_jobs' docstring says, get_job will not return all jobs when tag is an empty set
-        if len(tags) == 0:
-            active_jobs = self.scheduler.jobs
+    def get_jobs(self, tags: set[str] | None = None, any_tag: bool = True, is_paused: bool | None = None) -> set[StatefulJob]:
+        tags = tags or set()
+        if is_paused is None:
+            jobs = self.paused_jobs.union(self.scheduler.jobs)
         else:
-            active_jobs = set(filter(lambda job: job.tags.intersection(tags) if any_tag else job.tags == tags, self.scheduler.jobs))
+            jobs = self.paused_jobs if is_paused else self.scheduler.jobs
 
-        paused_jobs = set()
-        if include_paused:
-            paused_jobs = self.get_paused_jobs(tags, any_tag=any_tag)
+        if len(tags) > 0:
+            jobs = set(filter(lambda job: job.tags.intersection(tags) if any_tag else job.tags == tags, jobs))
 
-        return self.apply_state_to_jobs(active_jobs.union(paused_jobs))
+        return self.apply_state_to_jobs(jobs)
 
-    def job_exists(self, job_name: str):
-        return self.get_job_by_name(job_name, include_paused=True) is not None
+    def job_exists(self, job_name: str) -> bool:
+        return self.get_job_by_name(job_name) is not None
 
-    def get_paused_jobs(self, tags: set[str], any_tag: bool):
-        if len(tags) == 0:
-            return self.paused_jobs
-        return self.apply_state_to_jobs(set(filter(lambda job: job.tags.intersection(tags) if any_tag else job.tags == tags, self.paused_jobs)))
+    def get_jobs_by_state(self, is_paused: bool | None) -> set[StatefulJob]:
+        match is_paused:
+            case None:
+                return self.apply_state_to_jobs(self.scheduler.jobs.union(self.paused_jobs))
+            case True:
+                return self.apply_state_to_jobs(self.paused_jobs)
+            case False:
+                return self.apply_state_to_jobs(self.scheduler.jobs)
 
-    def pause_job(self, job_name: str):
-        job = self.get_job_by_name(job_name)
+    def get_job_by_name(self, job_name: str) -> StatefulJob | None:
+        for stateful_job in self.get_jobs():
+            if stateful_job.job.alias == job_name:
+                return stateful_job
+
+    def pause_job(self, job_name: str) -> StatefulJob:
+        job = self.get_job_by_name(job_name).job
         assert job is not None
         self.scheduler.delete_job(job)
         self.paused_jobs.add(job)
         logger.info(f"Paused job {job_name}")
-        return self.set_job_state_property(job, is_paused=True)
+        return StatefulJob(job, is_paused=True)
 
-    def pause_jobs_with_tags(self, tags: set[str], any_tag: bool):
-        jobs_to_pause = self.get_jobs(tags, any_tag, include_paused=False)
+    def pause_jobs(self, jobs_to_pause: set[StatefulJob]) -> set[StatefulJob]:
+        for stateful_job in jobs_to_pause:
+            self.pause_job(stateful_job.job.alias)
 
-        for job in jobs_to_pause:
-            self.pause_job(job.alias)
+        return self.apply_state_to_jobs(set(map(lambda state: state.job, jobs_to_pause)))
 
-        return self.apply_state_to_jobs(jobs_to_pause)
+    def resume_job(self, job_name: str) -> StatefulJob:
+        stateful_job = self.get_job_by_name(job_name)
+        if stateful_job.is_paused:
+            self.paused_jobs.remove(stateful_job.job)
+            task = self.scheduler._Scheduler__loop.create_task(self.scheduler._Scheduler__supervise_job(stateful_job.job))
+            self.scheduler._Scheduler__jobs[stateful_job.job] = task
+            logger.info(f"Resumed job {job_name}")
 
-    def resume_job(self, job_name: str) -> Job:
-        job = self.get_job_by_name(job_name, include_paused=True)
-        assert job is not None
-        self.paused_jobs.remove(job)
-        task = self.scheduler._Scheduler__loop.create_task(self.scheduler._Scheduler__supervise_job(job))
-        self.scheduler._Scheduler__jobs[job] = task
-        logger.info(f"Resumed job {job_name}")
-        return self.set_job_state_property(job, is_paused=False)
+        return StatefulJob(stateful_job.job, is_paused=False)
 
-    def resume_jobs_with_tags(self, tags: set[str], any_tag: bool):
-        jobs_to_resume = self.get_paused_jobs(tags, any_tag)
+    def resume_jobs(self, jobs_to_resume: set[StatefulJob]) -> set[StatefulJob]:
+        for stateful_job in jobs_to_resume:
+            self.resume_job(stateful_job.job.alias)
 
-        for job in jobs_to_resume:
-            self.resume_job(job.alias)
+        return self.apply_state_to_jobs(set(map(lambda state: state.job, jobs_to_resume)))
 
-        return self.apply_state_to_jobs(jobs_to_resume)
-
-    def delete_job(self, job_name: str) -> Job | None:
-        job = self.get_job_by_name(job_name, True)
-        if job in self.paused_jobs:
-            self.paused_jobs.remove(job)
+    def delete_job(self, job_name: str) -> StatefulJob | None:
+        stateful_job = self.get_job_by_name(job_name)
+        if stateful_job.is_paused:
+            self.paused_jobs.remove(stateful_job.job)
         else:
-            self.scheduler.delete_job(job)
+            self.scheduler.delete_job(stateful_job.job)
 
-        return job
+        return stateful_job
 
-    def delete_jobs_with_tags(self, tags: set[str], any_tag: bool, include_paused: bool = True):
-        active_jobs_to_delete = self.apply_state_to_jobs(self.get_jobs(tags, any_tag, include_paused=False))
-        self.scheduler.delete_jobs(tags, any_tag)
+    def delete_jobs(self, jobs_to_delete: set[StatefulJob]) -> set[StatefulJob]:
+        for stateful_job in jobs_to_delete:
+            if stateful_job.is_paused:
+                self.paused_jobs.remove(stateful_job.job)
+            else:
+                self.scheduler.delete_job(stateful_job.job)
 
-        paused_jobs_to_delete = set()
-        if include_paused:
-            paused_jobs_to_delete = self.apply_state_to_jobs(self.get_jobs(tags, any_tag, include_paused=True))
-            for job in paused_jobs_to_delete:
-                self.delete_job(job.alias)
-        return active_jobs_to_delete.union(paused_jobs_to_delete)
+        return jobs_to_delete
 
     async def trigger_job(self, job_name: str):
-        job = self.get_job_by_name(job_name, include_paused=True)
+        job = self.get_job_by_name(job_name).job
         assert job is not None
         await job.handle()
         logger.info(f"Job {job_name} triggered manually")
-        if job.max_attempts == 1:
-            self.scheduler.delete_job(job)
 
-    async def trigger_jobs_with_tags(self, tags: set[str], any_tag: bool, include_paused: bool):
-        jobs_to_trigger = self.apply_state_to_jobs(self.get_jobs(tags, any_tag, include_paused))
-
+    async def trigger_jobs(self, jobs_to_trigger: set[StatefulJob]) -> set[StatefulJob]:
         async with asyncio.TaskGroup() as tg:
-            [tg.create_task(job.handle()) for job in jobs_to_trigger]
+            [tg.create_task(stateful_job.job.handle()) for stateful_job in jobs_to_trigger]
 
-        for job in jobs_to_trigger:
-            logger.info(f"Job {job.alias} triggered manually")
-            if job.max_attempts == 1:
-                self.scheduler.delete_job(job)
+        for stateful_job in jobs_to_trigger:
+            logger.info(f"Job {stateful_job.job.alias} triggered manually")
 
         return jobs_to_trigger
 
-    def get_runs_of_a_job(self, job_name: str, page_size: int, page: int) -> list[Run]:
+    def get_runs_of_a_job(self, job_name: str, run_status: str, page_size: int, page: int) -> list[Run]:
         session = self.backend.ResultSession()
         with session_cleanup(session):
-            runs: list[Run] = list(session.scalars(select(Run).where(Run.job == job_name).order_by(Run.triggered_date.desc()).offset((page - 1) * page_size).limit(page_size).options(joinedload(Run.task_object))))
+            if run_status == "pending":
+                runs = list(session.scalars(select(Run).where(Run.job == job_name, ~Run.task_status.has()).order_by(Run.triggered_date.desc()).options(joinedload(Run.task_object))))
+            else:
+                runs: list[Run] = list(
+                    session.scalars(
+                        select(Run).where(Run.job == job_name, Run.task_status == run_status.upper()).order_by(Run.triggered_date.desc()).offset((page - 1) * page_size).limit(
+                            page_size).options(joinedload(Run.task_object))))
             return runs
 
     def get_run_of_a_job_by_id(self, job_name: str, run_id: int) -> Run | None:

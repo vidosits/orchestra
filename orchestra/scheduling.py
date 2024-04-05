@@ -1,6 +1,5 @@
 import logging
 import re
-import sys
 from datetime import datetime, time, timedelta
 from typing import Callable, Optional
 

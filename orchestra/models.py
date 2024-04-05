@@ -3,7 +3,8 @@ from enum import Enum
 
 import sqlalchemy as sa
 from celery.backends.database.models import TaskExtended, ResultModelBase
-from sqlalchemy import TIMESTAMP, Text, ForeignKey
+from sqlalchemy import TIMESTAMP
+from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
@@ -37,7 +38,8 @@ class Run(ResultModelBase):
     timezone: Mapped[str | None]
     triggered_date: Mapped[datetime] = sa.Column(TIMESTAMP(timezone=True))
 
-    task_object = relationship("TimingAwareTask", primaryjoin='foreign(Run.task_id) == TimingAwareTask.task_id')
+    task_object = relationship("TimingAwareTask", primaryjoin='foreign(Run.task_id) == TimingAwareTask.task_id', uselist=False)
+    task_status = association_proxy('task_object', 'status')
 
 
 class Status(str, Enum):
