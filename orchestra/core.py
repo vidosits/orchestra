@@ -373,7 +373,7 @@ class Orchestra(Celery):
             else:
                 runs: list[Run] = list(
                     session.scalars(
-                        select(Run).where(Run.job == job_name, Run.task_status == run_status.upper()).order_by(Run.triggered_date.desc()).offset((page - 1) * page_size).limit(
+                        select(Run).where(Run.job == job_name, Run.task_status == run_status.upper() if run_status else True).order_by(Run.triggered_date.desc()).offset((page - 1) * page_size).limit(
                             page_size).options(joinedload(Run.task_object))))
             return runs
 
