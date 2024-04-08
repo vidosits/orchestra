@@ -7,8 +7,8 @@ router = APIRouter(prefix="/api")
 
 
 @router.get("/tags", tags=["tags"])
-async def get_all_tags(include_paused: Annotated[bool, Query(description="Set to true to include paused jobs when collecting tags")] = True) -> set[str]:
+async def get_all_tags(is_paused: Annotated[bool | None, Query(description="Filter jobs by their state when searching for a match")] = None) -> set[str]:
     collected_tags: set[str] = set()
-    for job in instance.get_jobs(set(), any_tag=True, include_paused=include_paused):
-        collected_tags.update(job.tags)
+    for stateful_job in instance.get_jobs(set(), any_tag=True, is_paused=is_paused):
+        collected_tags.update(stateful_job.job.tags)
     return collected_tags
