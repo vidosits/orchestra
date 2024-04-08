@@ -369,7 +369,9 @@ class Orchestra(Celery):
         session = self.backend.ResultSession()
         with session_cleanup(session):
             if run_status == "pending":
-                runs = list(session.scalars(select(Run).where(Run.job == job_name, ~Run.task_status.has()).order_by(Run.triggered_date.desc()).options(joinedload(Run.task_object))))
+                runs = list(session.scalars(
+                    select(Run).where(Run.job == job_name, ~Run.task_status.has()).order_by(Run.triggered_date.desc()).order_by(Run.triggered_date.desc()).offset((page - 1) * page_size).limit(
+                        page_size).options(joinedload(Run.task_object))))
             else:
                 runs: list[Run] = list(
                     session.scalars(
