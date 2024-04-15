@@ -255,26 +255,26 @@ The output would look something like the following:
 ╭────────┬──────────┬────────────────────────────────────────────┬──────────────────────┬─────────────────────┬─────────────────┬──────────┬──────────┬─────────╮
 │State   │ Shedule  │ Job name                                   │ Module and task      │ Due at              │ Timezone        │ Due in   │ Attempts │ Tags    │
 ├────────┼──────────┼────────────────────────────────────────────┼──────────────────────┼─────────────────────┼─────────────────┼──────────┼──────────┼─────────┤
-│Running │ ONCE     │ task_at_9_13                               │ tasks.long_task      │ 2024-03-03 09:13:00 │ Europe/Berlin │ 0:36:09  │ 0/1      │ gpu     │
-│Running │ HOURLY   │ task_every_hour_at_05_00                   │ tasks.long_task      │ 2024-03-03 09:05:00 │ Europe/Berlin │ 0:28:09  │ 0/inf    │ gpu     │
+│Running │ ONCE     │ task_at_9_13                               │ tasks.long_task      │ 2024-03-03 09:13:00 │ Europe/Berlin   │ 0:36:09  │ 0/1      │ gpu     │
+│Running │ HOURLY   │ task_every_hour_at_05_00                   │ tasks.long_task      │ 2024-03-03 09:05:00 │ Europe/Berlin   │ 0:28:09  │ 0/inf    │ gpu     │
 │Running │ CYCLIC   │ exception_task_every_10_second             │ tasks.exception_task │ 2024-03-03 07:36:57 │ UTC             │ 0:00:06  │ 0/inf    │ cpu,fast│
-│Running │ DAILY    │ task_every_day_at_9_15                     │ tasks.long_task      │ 2024-03-03 09:15:00 │ Europe/Berlin │ 0:38:09  │ 0/inf    │ gpu     │
-│Running │ ONCE     │ task_next_23_00_00                         │ tasks.long_task      │ 2024-03-03 23:00:00 │ Europe/Berlin │ 14:23:09 │ 0/1      │ gpu     │
+│Running │ DAILY    │ task_every_day_at_9_15                     │ tasks.long_task      │ 2024-03-03 09:15:00 │ Europe/Berlin   │ 0:38:09  │ 0/inf    │ gpu     │
+│Running │ ONCE     │ task_next_23_00_00                         │ tasks.long_task      │ 2024-03-03 23:00:00 │ Europe/Berlin   │ 14:23:09 │ 0/1      │ gpu     │
 │Running │ ONCE     │ task_once_in_13_11_52                      │ tasks.long_task      │ 2024-03-03 20:48:39 │ UTC             │ 13:11:49 │ 0/1      │ gpu     │
 │Running │ CYCLIC   │ task_every_31_minutes_12_seconds           │ tasks.long_task      │ 2024-03-03 08:07:59 │ UTC             │ 0:31:09  │ 0/inf    │ gpu     │
 │Running │ CYCLIC   │ short_task_every_1_second                  │ tasks.short_task     │ 2024-03-03 07:36:51 │ UTC             │ 0:00:00  │ 3/inf    │ cpu,fast│
-│Running │ ONCE     │ task_at_11_23_00                           │ tasks.long_task      │ 2024-03-03 11:23:00 │ Europe/Berlin │ 2:46:09  │ 0/1      │ gpu     │
+│Running │ ONCE     │ task_at_11_23_00                           │ tasks.long_task      │ 2024-03-03 11:23:00 │ Europe/Berlin   │ 2:46:09  │ 0/1      │ gpu     │
 │Running │ ONCE     │ task_once_in_1_hour_and_10_minutes         │ tasks.long_task      │ 2024-03-03 08:46:47 │ UTC             │ 1:09:57  │ 0/1      │ gpu     │
-│Running │ WEEKLY   │ task_every_Monday_at_03_15_00              │ tasks.long_task      │ 2024-03-04 03:15:00 │ Europe/Berlin │ 18:38:09 │ 0/inf    │ gpu     │
-│Running │ DAILY    │ task_every_day_at_13_hours                 │ tasks.long_task      │ 2024-03-03 13:00:00 │ Europe/Berlin │ 4:23:09  │ 0/inf    │ gpu     │
-│Running │ ONCE     │ task_next_Tuesday_at_13_11_00              │ tasks.long_task      │ 2024-03-05 13:11:00 │ Europe/Berlin │ 2 days   │ 0/1      │ gpu     │
-│Running │ DAILY    │ task_every_day_on_9_03                     │ tasks.long_task      │ 2024-03-03 09:03:00 │ Europe/Berlin │ 0:26:09  │ 0/inf    │ gpu     │
-│Running │ MINUTELY │ task_every_minute_at_15_seconds            │ tasks.long_task      │ 2024-03-03 08:37:15 │ Europe/Berlin │ 0:00:24  │ 0/inf    │ gpu     │
-│Running │ ONCE     │ task_2024_04_01_09_13                      │ tasks.long_task      │ 2024-04-01 09:13:00 │ Europe/Berlin │ 28 days  │ 0/1      │ gpu     │
-│Running │ ONCE     │ task_once_Wednesday_at_01_15_00            │ tasks.long_task      │ 2024-03-06 01:15:00 │ Europe/Berlin │ 2 days   │ 0/1      │ gpu     │
-│Running │ ONCE     │ task_once_on_Thursday_00_31_41             │ tasks.long_task      │ 2024-03-07 00:31:41 │ Europe/Berlin │ 3 days   │ 0/1      │ gpu     │
+│Running │ WEEKLY   │ task_every_Monday_at_03_15_00              │ tasks.long_task      │ 2024-03-04 03:15:00 │ Europe/Berlin   │ 18:38:09 │ 0/inf    │ gpu     │
+│Running │ DAILY    │ task_every_day_at_13_hours                 │ tasks.long_task      │ 2024-03-03 13:00:00 │ Europe/Berlin   │ 4:23:09  │ 0/inf    │ gpu     │
+│Running │ ONCE     │ task_next_Tuesday_at_13_11_00              │ tasks.long_task      │ 2024-03-05 13:11:00 │ Europe/Berlin   │ 2 days   │ 0/1      │ gpu     │
+│Running │ DAILY    │ task_every_day_on_9_03                     │ tasks.long_task      │ 2024-03-03 09:03:00 │ Europe/Berlin   │ 0:26:09  │ 0/inf    │ gpu     │
+│Running │ MINUTELY │ task_every_minute_at_15_seconds            │ tasks.long_task      │ 2024-03-03 08:37:15 │ Europe/Berlin   │ 0:00:24  │ 0/inf    │ gpu     │
+│Running │ ONCE     │ task_2024_04_01_09_13                      │ tasks.long_task      │ 2024-04-01 09:13:00 │ Europe/Berlin   │ 28 days  │ 0/1      │ gpu     │
+│Running │ ONCE     │ task_once_Wednesday_at_01_15_00            │ tasks.long_task      │ 2024-03-06 01:15:00 │ Europe/Berlin   │ 2 days   │ 0/1      │ gpu     │
+│Running │ ONCE     │ task_once_on_Thursday_00_31_41             │ tasks.long_task      │ 2024-03-07 00:31:41 │ Europe/Berlin   │ 3 days   │ 0/1      │ gpu     │
 │Running │ ONCE     │ task_once_in_5_hours_2_minutes_and_15_sec… │ tasks.long_task      │ 2024-03-03 12:39:02 │ UTC             │ 5:02:12  │ 0/1      │ gpu     │
-│Running │ DAILY    │ task_every_day_at_09_15_14                 │ tasks.long_task      │ 2024-03-03 09:15:14 │ Europe/Berlin │ 0:38:23  │ 0/inf    │ gpu     │
+│Running │ DAILY    │ task_every_day_at_09_15_14                 │ tasks.long_task      │ 2024-03-03 09:15:14 │ Europe/Berlin   │ 0:38:23  │ 0/inf    │ gpu     │
 │Running │ CYCLIC   │ task_every_48_hours                        │ tasks.long_task      │ 2024-03-05 07:36:47 │ UTC             │ 1 day    │ 0/inf    │ gpu     │
 │Running │ WEEKLY   │ task_every_Monday_at_03_15_00_US           │ tasks.long_task      │ 2024-03-04 03:15:00 │ America/Boise   │ 1 day    │ 0/inf    │ gpu     │
 ╰────────┴──────────┴────────────────────────────────────────────┴──────────────────────┴─────────────────────┴─────────────────┴──────────┴──────────┴─────────╯
@@ -285,6 +285,7 @@ The output would look something like the following:
 ```
 
 ### Pausing and resuming jobs
+
 ```python
 import asyncio
 import datetime
@@ -317,25 +318,25 @@ async def main():
     orchestra.scheduler.cyclic(timing=datetime.timedelta(seconds=10), alias="Hello World every 10s", handle=hello)
 
     # schedule a Celery task function, Orchestra fully supports scheduling Celery tasks programmatically as well as through a schedule definition
-    orchestra.schedule_celery_task(schedule=orchestra.scheduler.cyclic,
-                                   timing=datetime.timedelta(seconds=1),
-                                   task=simple_task,
-                                   job_name="Simple task every 1s",
-                                   tags={"latency", "gpu"})
+    job1 = orchestra.schedule_celery_task(schedule=orchestra.scheduler.cyclic,
+                                          timing=datetime.timedelta(seconds=1),
+                                          task=simple_task,
+                                          job_name="Simple task every 1s",
+                                          tags={"latency", "gpu"})
 
-    orchestra.schedule_celery_task(schedule=orchestra.scheduler.weekly,
-                                   timing=trigger.Monday(datetime.time(hour=16, minute=30, tzinfo=pytz.timezone("Europe/Berlin"))),
-                                   task=simple_task,
-                                   job_name="Simple task every Monday at 16:30 UTC",
-                                   tags={"cpu"})
+    job2 = orchestra.schedule_celery_task(schedule=orchestra.scheduler.weekly,
+                                          timing=trigger.Monday(datetime.time(hour=16, minute=30, tzinfo=pytz.timezone("Europe/Berlin"))),
+                                          task=simple_task,
+                                          job_name="Simple task every Monday at 16:30 UTC",
+                                          tags={"cpu"})
 
-    # you may pause a task by name or by matching tags
+    # you may pause a task by name, references or by matching tags
     orchestra.pause_job("Simple task every Monday at 16:30 UTC")
 
-    orchestra.pause_jobs_with_tags({"latency"}, any_tag=True)
+    orchestra.pause_jobs({job1, job2})
 
     # resume job by name or by matching tags
-    orchestra.resume_jobs_with_tags({"latency"}, any_tag=True)
+    orchestra.resume_jobs(orchestra.get_jobs(tags={"latency"}))
 
     await orchestra.run()
 

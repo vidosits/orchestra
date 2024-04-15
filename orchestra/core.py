@@ -147,10 +147,10 @@ class Orchestra(Celery):
         return self.wrap_celery_task(job_name, task, additional_options)
 
     def schedule_celery_task(self, job_name: str, task: Callable, schedule: Callable[..., Job], timing: datetime.datetime | datetime.timedelta | datetime.time | Weekday,
-                             tags: set[str] | None = None, attempt_resume: bool = False, additional_options: dict = None):
+                             tags: set[str] | None = None, attempt_resume: bool = False, additional_options: dict = None) -> StatefulJob | None:
         module_name, _, task_name = task.name.rpartition(".")  # type:ignore
-        self.schedule_job(job_name=job_name, module_name=module_name, task_name=task_name, schedule=schedule, timing=timing, tags=tags, attempt_resume=attempt_resume,
-                          additional_options=additional_options)
+        return self.schedule_job(job_name=job_name, module_name=module_name, task_name=task_name, schedule=schedule, timing=timing, tags=tags, attempt_resume=attempt_resume,
+                                 additional_options=additional_options)
 
     async def create_schedule(self, module_definitions: list[dict] = None, loop=None) -> None:
         self.scheduler = self.scheduler or Scheduler(tzinfo=pytz.utc, loop=self.get_event_loop(loop))
@@ -158,7 +158,7 @@ class Orchestra(Celery):
             self.add_schedules(module_definitions)
 
     def schedule_job(self, job_name: str, module_name: str, task_name: str, schedule: Callable[..., Job], timing: datetime.datetime | datetime.timedelta | datetime.time | Weekday,
-                     tags: set[str] | None = None, attempt_resume: bool = False, additional_options: dict = None, schedule_definition: Any = None):
+                     tags: set[str] | None = None, attempt_resume: bool = False, additional_options: dict = None, schedule_definition: Any = None) -> StatefulJob | None:
         session = self.backend.ResultSession()
         with session_cleanup(session):
             resume_parameters: dict = {}
@@ -214,6 +214,8 @@ class Orchestra(Celery):
                 )
             else:
                 logger.info(f"Job {job_name} was scheduled to run {timing}")
+
+            return StatefulJob(job, is_paused=False)
 
     def add_schedules(self, module_definitions: list[dict], attempt_resume: bool = True):
         for index, block in enumerate(module_definitions or []):
