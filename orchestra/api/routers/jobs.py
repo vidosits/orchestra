@@ -44,7 +44,8 @@ async def schedule_new_job(module: Annotated[str, Body()], schedule_definition: 
                  "schedule": {
                      "timing": schedule_definition.timing,
                      "timezone": schedule_definition.timezone or "utc"
-                 }
+                 },
+                 "tags": set(schedule_definition.tags or [])
              }
          ]}]
     instance.add_schedules(module_definition, attempt_resume=schedule_definition.resume or False)
