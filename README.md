@@ -72,6 +72,7 @@ A list of examples of understood expressions:
 * once in 1 hour and 10 minutes
 * once in 2 minutes and 10 seconds
 * once in 17 seconds
+* always
 
 By default timing expression with only a time or timestamp (without date) like `11:23:00` will be interpreted as a time instant and will trigger the next time the wall clock shows the specified time.
 

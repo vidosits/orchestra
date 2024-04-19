@@ -1,10 +1,7 @@
 import yaml
-from rich import box
-from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
-from rich.table import Table
-from scheduler import Scheduler
 from scheduler.asyncio.job import Job
+
+from orchestra.job import StatefulJob
 
 
 def pretty_print_block(config_block: dict) -> str:
@@ -32,4 +29,19 @@ def get_job_state(job: Job) -> list[str]:
         row[5],
         f"{row[6]}/{row[7]}",
         ",".join(job.tags)
+    ]
+
+
+def get_job_state_for_always_running(job: StatefulJob) -> list[str]:
+    row = job.job._str()
+    return [
+        "[yellow]Paused[/]" if job.is_paused else "[green]Running[/]",
+        "Always On",
+        row[1] + row[2],
+        job.job.handle.__name__,
+        "-",
+        str(job.job.datetime.tzinfo),
+        "∞",
+        "1",
+        ",".join(job.job.tags)
     ]

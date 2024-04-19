@@ -21,7 +21,7 @@ from scheduler.trigger.core import Weekday
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
-from orchestra.formatting import pretty_print_block, get_job_state
+from orchestra.formatting import pretty_print_block, get_job_state, get_job_state_for_always_running
 from orchestra.job import StatefulJob
 from orchestra.models import Run, TimingAwareTask
 from orchestra.scheduling import Schedule
@@ -52,6 +52,7 @@ class Orchestra(Celery):
         self.loop_resolution_in_seconds = scheduler_loop_resolution_in_seconds
         self.server: uvicorn.Server | None = None
         self.paused_jobs: set[Job] = set()
+        self.always_running_jobs: set[StatefulJob] = set()
 
     def get_event_loop(self, loop):
         self.loop = loop or asyncio.get_running_loop()
@@ -160,9 +161,13 @@ class Orchestra(Celery):
     def schedule_job(self, job_name: str, module_name: str, task_name: str, schedule: Callable[..., Job], timing: datetime.datetime | datetime.timedelta | datetime.time | Weekday,
                      tags: set[str] | None = None, attempt_resume: bool = False, additional_options: dict = None, schedule_definition: Any = None) -> StatefulJob | None:
         session = self.backend.ResultSession()
+
+        timing_expression: str = schedule_definition.get("schedule").get("timing")
+        job_is_always_running = timing_expression == "always"
+
         with session_cleanup(session):
             resume_parameters: dict = {}
-            if attempt_resume:
+            if attempt_resume and not job_is_always_running:
                 logs = (
                     select(Run)
                     .where(Run.job == job_name)
@@ -207,17 +212,21 @@ class Orchestra(Celery):
 
             job.definition = schedule_definition or {}
 
+            if job_is_always_running:
+                # we need to keep track of this job even though it's going to get dropped from the scheduler
+                self.always_running_jobs.add(StatefulJob(job, is_paused=False))
+
             if "start" in resume_parameters:
                 logger.warning(
-                    f"Job {job_name} was scheduled to run {timing}, resuming using {last_running_time_local}, tz={last_run.timezone} as reference time."
+                    f"Job {job_name} was scheduled to run {timing_expression} ({timing}), resuming using {last_running_time_local}, tz={last_run.timezone} as reference time."
                     f" Next run at {next_run_local}, tz={last_run.timezone}"
                 )
             else:
-                logger.info(f"Job {job_name} was scheduled to run {timing}")
+                logger.info(f"Job {job_name} was scheduled to run {timing_expression} ({timing})")
 
             return StatefulJob(job, is_paused=False)
 
-    def add_schedules(self, module_definitions: list[dict], attempt_resume: bool = True):
+    def add_schedules(self, module_definitions: list[dict]):
         for index, block in enumerate(module_definitions or []):
             block_name: str = block.get("name", f"{index + 1}. schedule block")
             block_module: str | None = block.get("module")
@@ -408,7 +417,7 @@ class Orchestra(Celery):
         table.pad_edge = False
 
         table.add_column("State")
-        table.add_column("Shedule", style="green")
+        table.add_column("Schedule", style="green")
         table.add_column("Job name", style="blue")
         table.add_column("Module and task", style="magenta")
         table.add_column("Due at", style="red")
@@ -422,6 +431,9 @@ class Orchestra(Celery):
 
         for job in self.paused_jobs:
             table.add_row(*(["[yellow]Paused[/]"] + get_job_state(job)))
+
+        for job in self.always_running_jobs:
+            table.add_row(*get_job_state_for_always_running(job))
 
         progress = Progress(TextColumn("{task.description}"), BarColumn(bar_width=None), expand=True, transient=True)
         progress.add_task("Orchestrating jobs", total=None)

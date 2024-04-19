@@ -148,9 +148,13 @@ class Schedule:
         once in 1 hour and 10 minutes
         once in 2 minutes and 10 seconds
         once in 17 seconds
+        always
         """
 
         clean_timing = self.clean_timing(self.definition["schedule"]["timing"])
+
+        if clean_timing == "always":
+            return self.scheduler.once, None, timedelta(seconds=0)
 
         # there is a complete datetime in the timing, those can only happen once, without a trigger
         if (
