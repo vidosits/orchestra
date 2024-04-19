@@ -268,7 +268,7 @@ class Orchestra(Celery):
                                   schedule=schedule.job_type,
                                   timing=schedule.get_timing(),
                                   tags=set(schedule_definition.get("tags", set())),
-                                  attempt_resume=attempt_resume,
+                                  attempt_resume=schedule_definition.get("schedule").get("resume_from_previous", False),
                                   additional_options=schedule_definition.get("additional_options"),
                                   schedule_definition=schedule_definition)
 

@@ -43,12 +43,13 @@ async def schedule_new_job(module: Annotated[str, Body()], schedule_definition: 
                  "enabled": True,
                  "schedule": {
                      "timing": schedule_definition.timing,
-                     "timezone": schedule_definition.timezone or "utc"
+                     "timezone": schedule_definition.timezone or "utc",
+                     "resume_from_previous": schedule_definition.resume_from_previous
                  },
                  "tags": set(schedule_definition.tags or [])
              }
          ]}]
-    instance.add_schedules(module_definition, attempt_resume=schedule_definition.resume or False)
+    instance.add_schedules(module_definition)
 
 
 @router.get("/jobs", tags=["jobs"])
