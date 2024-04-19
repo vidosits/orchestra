@@ -16,4 +16,4 @@ class ScheduleDefinitionDTO(BaseModel):
                                      timing=definition["schedule"].get("timing"),
                                      timezone=definition["schedule"].get("timezone"),
                                      tags=definition.get("tags"),
-                                     resume_from_previous=definition["schedule"].get("resume_from_previous"))
+                                     resume_from_previous=definition["schedule"].get("resume_from_previous", False))
