@@ -2,6 +2,7 @@ import json
 import datetime
 from typing import Any
 
+import pytz
 from pydantic import BaseModel
 
 from orchestra.models import TimingAwareTask, Status
@@ -14,7 +15,7 @@ class TaskDTO(BaseModel):
     job_name: str
     status: Status
     result: Any
-    date_done: datetime.datetime
+    date_done: datetime.datetime | None
     traceback: str | None
     args: list
     kwargs: dict
@@ -32,13 +33,13 @@ class TaskDTO(BaseModel):
                        job_name=task.job_name,
                        status=Status[task.status.lower()],
                        result=task.result,
-                       date_done=task.date_done,
+                       date_done=task.date_done.replace(tzinfo=pytz.utc) if task.date_done else None,
                        traceback=task.traceback,
                        args=json.loads(task.args.decode("utf-8")),
                        kwargs=json.loads(task.kwargs.decode("utf-8")),
                        worker=task.worker,
                        retries=task.retries,
                        queue=task.queue,
-                       date_created=task.date_created,
-                       date_started=task.date_started)
+                       date_created=task.date_created.replace(tzinfo=pytz.utc),
+                       date_started=task.date_started.replace(tzinfo=pytz.utc))
 
